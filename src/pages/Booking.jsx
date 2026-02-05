@@ -253,6 +253,7 @@ const Booking = () => {
         try {
             const seatDetails = selectedSeats.map(seatId => {
                 const seat = seats.find(s => s.id === seatId);
+                console.log("SEAT:", seatId, "- Price:", seat?.price, "- Row:", seat?.row);
                 return {
                     id: seatId,
                     row: seat.row,
@@ -279,6 +280,8 @@ const Booking = () => {
                 status: "confirmed"
             };
 
+            console.log("SEAT DETAILS BEING SAVED:", seatDetails);
+            console.log("TOTAL AMOUNT CALCULATED:", calculateTotal());
             console.log("SAVING BOOKING:", booking);
 
             const savedBooking = await createBooking(booking);
@@ -428,7 +431,7 @@ const Booking = () => {
                                 </div>
                                 <div className="confirmation-row total">
                                     <span className="confirmation-label">💰 Total</span>
-                                    <span className="confirmation-value">Rs. {confirmationData.totalAmount}</span>
+                                    <span className="confirmation-value">Rs. {confirmationData.totalAmount.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -543,13 +546,18 @@ const Booking = () => {
 
                         <div className="price-summary">
                             <h3>Price Summary</h3>
-                            <div className="price-row">
-                                <span>Seats ({selectedSeats.length})</span>
-                                <span>Rs. {calculateTotal()}</span>
-                            </div>
+                            {selectedSeats.map(seatId => {
+                                const seat = seats.find(s => s.id === seatId);
+                                return (
+                                    <div key={seatId} className="price-row">
+                                        <span>Seat {seatId} (Row {seat?.row})</span>
+                                        <span>Rs. {seat?.price?.toLocaleString()}</span>
+                                    </div>
+                                );
+                            })}
                             <div className="price-total">
                                 <span>Total</span>
-                                <span>Rs. {calculateTotal()}</span>
+                                <span>Rs. {calculateTotal().toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -558,7 +566,7 @@ const Booking = () => {
                             disabled={bookingLoading || selectedSeats.length === 0}
                             className="book-btn"
                         >
-                            {bookingLoading ? "Booking Complete" : `Book Now - Rs. ${calculateTotal()}`}
+                            {bookingLoading ? "Booking Complete" : `Book Now - Rs. ${calculateTotal().toLocaleString()}`}
                         </button>
                     </div>
 

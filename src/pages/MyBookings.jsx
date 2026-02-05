@@ -140,7 +140,7 @@ const MyBookings = () => {
                                 fontSize: 14,
                                 fontWeight: 600
                             }}>
-                                Rs. {booking.totalAmount || booking.totalPrice}
+                                Rs. {(booking.totalAmount || booking.totalPrice || 0).toLocaleString()}
                             </span>
                         </div>
                     </div>
