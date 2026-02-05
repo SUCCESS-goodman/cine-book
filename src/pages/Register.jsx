@@ -1,7 +1,38 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { validateEmail, validatePassword } from "../utils/validationPatterns.js";
+
+// Validation patterns for Register / Login forms
+
+const EMAIL_PATTERN = {
+    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    message: "Please enter a valid email address",
+};
+
+// Password: at least one letter, one number, 8+ characters
+const PASSWORD_PATTERN = {
+    value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/,
+    message: "Password must contain at least one letter and one number (min 8 characters)",
+};
+
+// Stronger password: lowercase, uppercase, digit, special char (@$!%?&)
+const PASSWORD_STRONG_PATTERN = {
+    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
+    message: "Password must contain at least one lowercase, one uppercase, one number and one special character (@$!%*?&)",
+};
+
+function validateEmail(email) {
+    if (!email?.trim()) return "Email is required";
+    if (!EMAIL_PATTERN.value.test(email.trim())) return EMAIL_PATTERN.message;
+    return null;
+}
+
+function validatePassword(password, useStrong = false) {
+    if (!password) return "Password is required";
+    const pattern = useStrong ? PASSWORD_STRONG_PATTERN : PASSWORD_PATTERN;
+    if (!pattern.value.test(password)) return pattern.message;
+    return null;
+}
 
 const COOKIE_CONSENT_NAME = "cinebook_cookie_consent";
 const COOKIE_CONSENT_HOURS = 2;
@@ -318,7 +349,7 @@ export default function Register({ onSwitchToLogin, onSuccess }) {
                             }}
                         />
                         <label style={formStyles.checkboxLabel} htmlFor="reg-cookies">
-                            I accept the use of cookies and agree to the privacy policy. CINE BOOK uses cookies to improve your experience.
+                            I accept the use of cookies and agree. CINE BOOK to the privacy policy uses cookies to improve your experience.
                         </label>
                     </div>
                     {errors.cookies && <p style={formStyles.error}>{errors.cookies}</p>}

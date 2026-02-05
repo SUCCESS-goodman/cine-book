@@ -37,14 +37,20 @@ export const getMoviesByStatus = async (status) => {
 // Bookings Collection
 export const createBooking = async (bookingData) => {
     const bookingsRef = collection(db, "bookings");
+    console.log("FIRESTORE: Saving booking for user:", bookingData.userId);
     const docRef = await addDoc(bookingsRef, {
         ...bookingData,
         createdAt: new Date().toISOString(),
     });
-    return docRef.id;
+    console.log("FIRESTORE: Booking saved with ID:", docRef.id);
+    return {
+        id: docRef.id,
+        ...bookingData,
+    };
 };
 
 export const getUserBookings = async (userId) => {
+    console.log("FIRESTORE: Querying bookings for userId:", userId);
     const bookingsRef = collection(db, "bookings");
     const q = query(
         bookingsRef,
@@ -52,7 +58,10 @@ export const getUserBookings = async (userId) => {
         orderBy("createdAt", "desc")
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("FIRESTORE: Found", snapshot.docs.length, "bookings");
+    const bookings = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("FIRESTORE: Bookings data:", bookings);
+    return bookings;
 };
 
 export const getBookingById = async (bookingId) => {

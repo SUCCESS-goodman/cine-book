@@ -1,107 +1,19 @@
-/* Import StreamX Theme */
+/* StreamX Theme - Main Stylesheet */
 @import './styles/streamx-theme.css';
 
-/* Netflix-style Global Styles - Legacy */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-:root {
-  --netflix-red: #E50914;
-  --netflix-red-dark: #b20710;
-  --netflix-black: #141414;
-  --netflix-dark: #181818;
-  --netflix-gray: #808080;
-  --netflix-white: #ffffff;
-  --netflix-dark-gray: #e5e5e5;
-  --font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-width: 320px;
+/* Page Layout */
+.streamx-page {
+  background: linear-gradient(180deg, #0f0f1a 0%, #141414 50%, #0f0f1a 100%);
   min-height: 100vh;
-  width: 100%;
-  background-color: #0f0f1a;
-  font-family: var(--font-family);
-  color: #ffffff;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+  padding-top: var(--navbar-height);
+  padding-bottom: 60px;
+  position: relative;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #0f0f1a;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #8b5cf6;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a78bfa;
-}
-
-/* Links */
-a {
-  color: #ffffff;
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-
-a:hover {
-  color: #a78bfa;
-}
-
-/* Buttons */
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-input {
-  font-family: inherit;
-}
-
-/* Container */
-.container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 60px;
-}
-
-/* Section Titles */
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: #ffffff;
-}
-
-/* Hover Scale Effect */
-.hover-scale {
-  transition: transform 0.3s ease, z-index 0.3s ease;
-}
-
-.hover-scale:hover {
-  transform: scale(1.05);
-  z-index: 10;
+/* Responsive container */
+@media (max-width: 768px) {
+  .streamx-page {
+    padding-top: 60px;
+    padding-bottom: 40px;
+  }
 }

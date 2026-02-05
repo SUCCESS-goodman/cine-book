@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { validateEmail } from "../utils/validationPatterns.js";
+
+// Validation patterns
+const EMAIL_PATTERN = {
+    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    message: "Please enter a valid email address",
+};
+
+function validateEmail(email) {
+    if (!email?.trim()) return "Email is required";
+    if (!EMAIL_PATTERN.value.test(email.trim())) return EMAIL_PATTERN.message;
+    return null;
+}
 
 const formStyles = {
     wrap: {

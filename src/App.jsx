@@ -41,7 +41,7 @@ const App = () => {
           } />
           <Route path="/movies" element={
             <ProtectedRoute>
-              <Movies />
+              <Movies key="movies-page" />
             </ProtectedRoute>
           } />
           <Route path="/movies/:id" element={

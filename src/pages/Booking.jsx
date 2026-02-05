@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getMovieById, createBooking, getAllTheatres, getUserBookings } from "../services/firestore.js";
+import "./Booking.css";
 
 // Sample fallback theatres
 const fallbackTheatres = [
@@ -51,7 +53,7 @@ const generateSeats = () => {
                 row,
                 number: i,
                 isBooked: false,
-                price: row <= "C" ? 15 : row <= "E" ? 12 : 10
+                price: row <= "C" ? 1500 : row <= "E" ? 1200 : 1000 // Prices in NPR
             });
         }
     });
@@ -64,11 +66,27 @@ const formatDuration = (minutes) => {
     return `${hours}h ${mins}m`;
 };
 
-// Lazy load firestore to avoid startup errors
-let getMovieById = null;
-let createBooking = null;
-let getAllTheatres = null;
-let getUserBookings = null;
+// Helper function to format dates (handles both string and Firestore Timestamp)
+const formatDate = (dateValue) => {
+    if (!dateValue) return "";
+    const dateObj = dateValue?.toDate?.() || new Date(dateValue);
+    return dateObj.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+    });
+};
+
+const getAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        dates.push(date.toISOString().split('T')[0]);
+    }
+    return dates;
+};
 
 const Booking = () => {
     const { id } = useParams();
@@ -85,39 +103,21 @@ const Booking = () => {
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [bookingLoading, setBookingLoading] = useState(false);
     const [userBookings, setUserBookings] = useState([]);
+    const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+    const [confirmationData, setConfirmationData] = useState(null);
 
     const showtimes = ["10:00 AM", "1:00 PM", "4:00 PM", "7:00 PM", "10:00 PM"];
-
-    const getAvailableDates = () => {
-        const dates = [];
-        const today = new Date();
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(today);
-            date.setDate(today.getDate() + i);
-            dates.push(date.toISOString().split('T')[0]);
-        }
-        return dates;
-    };
-
-    // Lazy import firestore functions
-    useEffect(() => {
-        const loadFirestore = async () => {
-            try {
-                const firestore = await import("../services/firestore.js");
-                getMovieById = firestore.getMovieById;
-                createBooking = firestore.createBooking;
-                getAllTheatres = firestore.getAllTheatres;
-                getUserBookings = firestore.getUserBookings;
-            } catch (error) {
-                console.warn("Firestore not available, using fallback data");
-            }
-        };
-        loadFirestore();
-    }, []);
 
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
+
+            // Reset state when movie changes
+            setMovie(null);
+            setSelectedSeats([]);
+            setBookingSuccess(false);
+            setShowConfirmationModal(false);
+            setConfirmationData(null);
 
             // Set default date and time immediately
             const dates = getAvailableDates();
@@ -126,15 +126,10 @@ const Booking = () => {
 
             // Load theatres immediately with fallback
             try {
-                if (getAllTheatres) {
-                    const theatresData = await getAllTheatres();
-                    if (theatresData && theatresData.length > 0) {
-                        setTheatres(theatresData);
-                        setSelectedTheatre(theatresData[0].id);
-                    } else {
-                        setTheatres(fallbackTheatres);
-                        setSelectedTheatre(fallbackTheatres[0].id);
-                    }
+                const theatresData = await getAllTheatres();
+                if (theatresData && theatresData.length > 0) {
+                    setTheatres(theatresData);
+                    setSelectedTheatre(theatresData[0].id);
                 } else {
                     setTheatres(fallbackTheatres);
                     setSelectedTheatre(fallbackTheatres[0].id);
@@ -150,28 +145,51 @@ const Booking = () => {
 
             // Load movie
             try {
-                if (getMovieById) {
-                    const movieData = await getMovieById(id);
-                    if (movieData) {
-                        const formattedMovie = {
-                            id: movieData.id,
-                            title: movieData.title,
-                            poster: movieData.image,
-                            rating: movieData.rating,
-                            duration: formatDuration(movieData.duration),
-                            synopsis: movieData.synopsis,
-                            genre: Array.isArray(movieData.genre) ? movieData.genre.join(", ") : movieData.genre
-                        };
-                        setMovie(formattedMovie);
-                    } else {
-                        setMovie(sampleMovies[id] || sampleMovies["movie_1"]);
-                    }
+                const movieData = await getMovieById(id);
+                if (movieData) {
+                    const formattedMovie = {
+                        id: movieData.id,
+                        title: movieData.title,
+                        poster: movieData.image || movieData.poster,
+                        rating: movieData.rating,
+                        duration: formatDuration(movieData.duration),
+                        synopsis: movieData.synopsis,
+                        genre: Array.isArray(movieData.genre) ? movieData.genre.join(", ") : movieData.genre
+                    };
+                    setMovie(formattedMovie);
+                } else if (sampleMovies[id]) {
+                    // Use sample movie from fallback
+                    const sampleMovie = sampleMovies[id];
+                    const formattedSampleMovie = {
+                        id: sampleMovie.id,
+                        title: sampleMovie.title,
+                        poster: sampleMovie.poster,
+                        rating: sampleMovie.rating,
+                        duration: sampleMovie.duration,
+                        synopsis: "",
+                        genre: ""
+                    };
+                    setMovie(formattedSampleMovie);
                 } else {
-                    setMovie(sampleMovies[id] || sampleMovies["movie_1"]);
+                    console.warn("Movie not found:", id);
+                    setMovie(null);
                 }
             } catch (e) {
                 console.warn("Error loading movie:", e);
-                setMovie(sampleMovies[id] || sampleMovies["movie_1"]);
+                if (sampleMovies[id]) {
+                    const sampleMovie = sampleMovies[id];
+                    setMovie({
+                        id: sampleMovie.id,
+                        title: sampleMovie.title,
+                        poster: sampleMovie.poster,
+                        rating: sampleMovie.rating,
+                        duration: sampleMovie.duration,
+                        synopsis: "",
+                        genre: ""
+                    });
+                } else {
+                    setMovie(null);
+                }
             }
 
             setLoading(false);
@@ -183,7 +201,7 @@ const Booking = () => {
     // Fetch user's bookings for this movie
     useEffect(() => {
         const loadUserBookings = async () => {
-            if (!user || !getUserBookings) return;
+            if (!user) return;
 
             try {
                 const allBookings = await getUserBookings(user.uid);
@@ -216,12 +234,16 @@ const Booking = () => {
     };
 
     const handleBooking = async () => {
+        console.log("BOOKING BUTTON CLICKED");
+
         if (!user) {
+            console.log("NO USER - Redirecting to login");
             navigate("/login");
             return;
         }
 
         if (selectedSeats.length === 0) {
+            console.log("NO SEATS SELECTED");
             alert("Please select at least one seat");
             return;
         }
@@ -257,64 +279,54 @@ const Booking = () => {
                 status: "confirmed"
             };
 
-            if (createBooking) {
-                await createBooking(booking);
+            console.log("SAVING BOOKING:", booking);
 
-                // Refresh user bookings (separate try-catch to not affect main booking)
-                try {
-                    if (user && getUserBookings) {
-                        const allBookings = await getUserBookings(user.uid);
-                        const movieBookings = allBookings.filter(b => b.movieId === id);
-                        setUserBookings(movieBookings);
-                    }
-                } catch (refreshError) {
-                    console.warn("Could not refresh bookings:", refreshError);
-                }
-            }
+            const savedBooking = await createBooking(booking);
 
-            setBookingSuccess(true);
+            console.log("BOOKING SAVED ✅", savedBooking);
+
+            // Update UI instantly with the saved booking
+            setUserBookings(prev => [...prev, savedBooking]);
+
+            // Set confirmation data and show modal
+            setConfirmationData({
+                movie: movie,
+                theatre: theatre?.name || "N/A",
+                location: theatre?.location || "",
+                date: selectedDate,
+                time: selectedTime,
+                seats: selectedSeats.join(", "),
+                totalAmount: calculateTotal()
+            });
+            setShowConfirmationModal(true);
         } catch (error) {
-            console.error("Booking error:", error);
+            console.error("BOOKING FAILED ❌", error);
             alert("Failed to complete booking. Please try again.");
         } finally {
             setBookingLoading(false);
         }
     };
 
+    const closeModal = () => {
+        setShowConfirmationModal(false);
+        setConfirmationData(null);
+        setBookingSuccess(true);
+    };
+
     if (loading) {
         return (
-            <div style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                minHeight: "60vh",
-                color: "#fff"
-            }}>
-                Loading...
+            <div className="booking-loading">
+                <div className="streamx-loader"></div>
             </div>
         );
     }
 
     if (!movie) {
         return (
-            <div style={{
-                maxWidth: 600,
-                margin: "0 auto",
-                padding: "60px 20px",
-                textAlign: "center"
-            }}>
+            <div className="booking-not-found">
                 <h1 style={{ color: "#fff", marginBottom: 16 }}>Movie not found</h1>
                 <Link to="/movies">
-                    <button style={{
-                        padding: "14px 28px",
-                        borderRadius: 10,
-                        border: "none",
-                        background: "linear-gradient(90deg,#7c3aed,#a78bfa)",
-                        color: "#fff",
-                        fontSize: 16,
-                        fontWeight: 600,
-                        cursor: "pointer"
-                    }}>
+                    <button className="streamx-btn streamx-btn-primary">
                         Back to Movies
                     </button>
                 </Link>
@@ -323,59 +335,30 @@ const Booking = () => {
     }
 
     return (
-        <div style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 20px" }}>
-            <Link to={`/movies/${id}`} style={{ color: "#a78bfa", textDecoration: "none", display: "inline-block", marginBottom: 20 }}>
+        <div className="booking-page">
+            <Link to={`/movies/${id}`} className="booking-back-link">
                 ← Back to Movie Details
             </Link>
 
-            <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 24, color: "#fff" }}>
+            <h1 className="booking-title">
                 Book Tickets - {movie.title}
             </h1>
 
             {/* Show user's previous bookings for this movie */}
             {user && userBookings.length > 0 && (
-                <div style={{
-                    background: "rgba(167, 139, 250, 0.1)",
-                    border: "1px solid rgba(167, 139, 250, 0.3)",
-                    borderRadius: 12,
-                    padding: 20,
-                    marginBottom: 32
-                }}>
-                    <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: "#a78bfa" }}>
+                <div className="user-bookings-section">
+                    <h3 className="user-bookings-title">
                         🎬 Your Previous Bookings for {movie.title}
                     </h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         {userBookings.map((booking, index) => (
-                            <div key={index} style={{
-                                background: "rgba(255,255,255,0.05)",
-                                borderRadius: 8,
-                                padding: 16,
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                flexWrap: "wrap",
-                                gap: 12
-                            }}>
-                                <div>
-                                    <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
-                                        📅 {new Date(booking.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at {booking.time}
-                                    </p>
-                                    <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                                        🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}
-                                    </p>
-                                    <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                                        📍 {booking.theatreName}
-                                    </p>
+                            <div key={index} className="booking-item">
+                                <div className="booking-item-info">
+                                    <p>📅 {formatDate(booking.date)} at {booking.time}</p>
+                                    <p>🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}</p>
+                                    <p>📍 {booking.theatreName}</p>
                                 </div>
-                                <span style={{
-                                    padding: "6px 12px",
-                                    background: booking.status === "confirmed" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                    color: booking.status === "confirmed" ? "#10b981" : "#ef4444",
-                                    borderRadius: 20,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    textTransform: "capitalize"
-                                }}>
+                                <span className={`booking-status ${booking.status}`}>
                                     {booking.status}
                                 </span>
                             </div>
@@ -385,51 +368,24 @@ const Booking = () => {
             )}
 
             {bookingSuccess && (
-                <div style={{
-                    background: "rgba(16, 185, 129, 0.2)",
-                    border: "2px solid #10b981",
-                    borderRadius: 16,
-                    padding: 40,
-                    textAlign: "center",
-                    marginBottom: 32
-                }}>
-                    <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-                    <h2 style={{ color: "#10b981", fontSize: 32, marginBottom: 16 }}>Booking Successful!</h2>
-                    <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 18, marginBottom: 8 }}>
-                        Your tickets have been booked successfully.
-                    </p>
-                    <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, marginBottom: 24 }}>
+                <div className="booking-success">
+                    <div className="booking-success-icon">🎉</div>
+                    <h2>Booking Successful!</h2>
+                    <p>Your tickets have been booked successfully.</p>
+                    <div className="booking-success-details">
                         Theatre: {theatres.find(t => t.id === selectedTheatre)?.name}<br />
-                        Date: {new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}<br />
+                        Date: {formatDate(selectedDate)}<br />
                         Time: {selectedTime}<br />
                         Seats: {selectedSeats.join(", ")}
-                    </p>
-                    <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
+                    </div>
+                    <div className="booking-success-buttons">
                         <Link to="/bookings">
-                            <button style={{
-                                padding: "14px 28px",
-                                borderRadius: 10,
-                                border: "none",
-                                background: "linear-gradient(90deg,#7c3aed,#a78bfa)",
-                                color: "#fff",
-                                fontSize: 16,
-                                fontWeight: 600,
-                                cursor: "pointer"
-                            }}>
+                            <button className="streamx-btn streamx-btn-primary">
                                 View My Bookings
                             </button>
                         </Link>
                         <Link to="/movies">
-                            <button style={{
-                                padding: "14px 28px",
-                                borderRadius: 10,
-                                border: "2px solid rgba(255,255,255,0.3)",
-                                background: "transparent",
-                                color: "#fff",
-                                fontSize: 16,
-                                fontWeight: 600,
-                                cursor: "pointer"
-                            }}>
+                            <button className="streamx-btn streamx-btn-secondary">
                                 Book More Tickets
                             </button>
                         </Link>
@@ -437,44 +393,84 @@ const Booking = () => {
                 </div>
             )}
 
+            {/* Confirmation Modal */}
+            {showConfirmationModal && confirmationData && (
+                <div className="confirmation-modal-overlay" onClick={closeModal}>
+                    <div className="confirmation-modal" onClick={e => e.stopPropagation()}>
+                        <div className="confirmation-modal-header">
+                            <span className="confirmation-icon">🎉</span>
+                            <h2>Booking Confirmed!</h2>
+                        </div>
+                        <div className="confirmation-modal-body">
+                            <div className="confirmation-movie">
+                                <img src={confirmationData.movie.poster} alt={confirmationData.movie.title} />
+                                <div>
+                                    <h3>{confirmationData.movie.title}</h3>
+                                    <p>⭐ {confirmationData.movie.rating} • {confirmationData.movie.duration}</p>
+                                </div>
+                            </div>
+                            <div className="confirmation-details">
+                                <div className="confirmation-row">
+                                    <span className="confirmation-label">🎭 Theatre</span>
+                                    <span className="confirmation-value">{confirmationData.theatre}</span>
+                                </div>
+                                <div className="confirmation-row">
+                                    <span className="confirmation-label">📅 Date</span>
+                                    <span className="confirmation-value">{formatDate(confirmationData.date)}</span>
+                                </div>
+                                <div className="confirmation-row">
+                                    <span className="confirmation-label">⏰ Time</span>
+                                    <span className="confirmation-value">{confirmationData.time}</span>
+                                </div>
+                                <div className="confirmation-row">
+                                    <span className="confirmation-label">🎟️ Seats</span>
+                                    <span className="confirmation-value">{confirmationData.seats}</span>
+                                </div>
+                                <div className="confirmation-row total">
+                                    <span className="confirmation-label">💰 Total</span>
+                                    <span className="confirmation-value">Rs. {confirmationData.totalAmount}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="confirmation-modal-footer">
+                            <Link to="/bookings">
+                                <button className="streamx-btn streamx-btn-primary">
+                                    View My Bookings
+                                </button>
+                            </Link>
+                            <button className="streamx-btn streamx-btn-secondary" onClick={closeModal}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {!bookingSuccess && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
+                <div className="booking-grid">
                     <div>
-                        <div style={{ display: "flex", gap: 20, marginBottom: 32 }}>
+                        <div className="movie-info">
                             <img
                                 src={movie.poster}
                                 alt={movie.title}
-                                style={{ width: 80, borderRadius: 8 }}
+                                className="movie-poster"
                             />
-                            <div>
-                                <h3 style={{ color: "#fff", marginBottom: 8 }}>{movie.title}</h3>
-                                <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
-                                    ⭐ {movie.rating} • {movie.duration}
-                                </p>
+                            <div className="movie-details">
+                                <h3>{movie.title}</h3>
+                                <p className="movie-meta">⭐ {movie.rating} • {movie.duration}</p>
                             </div>
                         </div>
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: "block", color: "#fff", marginBottom: 8, fontWeight: 500 }}>
-                                Select Theatre
-                            </label>
+                        <div className="form-group">
+                            <label className="form-label">Select Theatre</label>
                             {theatres.length > 0 ? (
                                 <select
                                     value={selectedTheatre}
                                     onChange={(e) => setSelectedTheatre(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        borderRadius: 8,
-                                        border: "1px solid rgba(255,255,255,0.3)",
-                                        background: "rgba(255,255,255,0.08)",
-                                        color: "#fff",
-                                        fontSize: 14,
-                                        cursor: "pointer"
-                                    }}
+                                    className="form-select"
                                 >
                                     {theatres.map(theatre => (
-                                        <option key={theatre.id} value={theatre.id} style={{ background: "#1f2937", color: "#fff" }}>
+                                        <option key={theatre.id} value={theatre.id}>
                                             {theatre.name} - {theatre.location}
                                         </option>
                                     ))}
@@ -484,49 +480,29 @@ const Booking = () => {
                             )}
                         </div>
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: "block", color: "#fff", marginBottom: 8, fontWeight: 500 }}>
-                                Select Date
-                            </label>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div className="form-group">
+                            <label className="form-label">Select Date</label>
+                            <div className="date-selector">
                                 {getAvailableDates().map(date => (
                                     <button
                                         key={date}
                                         onClick={() => setSelectedDate(date)}
-                                        style={{
-                                            padding: "10px 16px",
-                                            borderRadius: 8,
-                                            border: selectedDate === date ? "2px solid #a78bfa" : "1px solid rgba(255,255,255,0.3)",
-                                            background: selectedDate === date ? "rgba(167, 139, 250, 0.2)" : "rgba(255,255,255,0.08)",
-                                            color: "#fff",
-                                            cursor: "pointer",
-                                            fontSize: 14
-                                        }}
+                                        className={`date-btn ${selectedDate === date ? 'active' : ''}`}
                                     >
-                                        {new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                                        {formatDate(date)}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: "block", color: "#fff", marginBottom: 8, fontWeight: 500 }}>
-                                Select Time
-                            </label>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div className="form-group">
+                            <label className="form-label">Select Time</label>
+                            <div className="time-selector">
                                 {showtimes.map(time => (
                                     <button
                                         key={time}
                                         onClick={() => setSelectedTime(time)}
-                                        style={{
-                                            padding: "10px 20px",
-                                            borderRadius: 8,
-                                            border: selectedTime === time ? "2px solid #a78bfa" : "1px solid rgba(255,255,255,0.3)",
-                                            background: selectedTime === time ? "rgba(167, 139, 250, 0.2)" : "rgba(255,255,255,0.08)",
-                                            color: "#fff",
-                                            cursor: "pointer",
-                                            fontSize: 14
-                                        }}
+                                        className={`time-btn ${selectedTime === time ? 'active' : ''}`}
                                     >
                                         {time}
                                     </button>
@@ -534,140 +510,72 @@ const Booking = () => {
                             </div>
                         </div>
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: "block", color: "#fff", marginBottom: 8, fontWeight: 500 }}>
-                                Select Seats ({selectedSeats.length} selected)
-                            </label>
-                            <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(12, 1fr)",
-                                gap: 4,
-                                maxWidth: 400
-                            }}>
+                        <div className="form-group">
+                            <label className="form-label">Select Seats ({selectedSeats.length} selected)</label>
+                            <div className="seat-selector">
                                 {seats.map((seat) => (
                                     <button
                                         key={seat.id}
                                         onClick={() => !seat.isBooked && toggleSeat(seat.id)}
                                         disabled={seat.isBooked}
-                                        title={`Row ${seat.row}, Seat ${seat.number} - $${seat.price}`}
-                                        style={{
-                                            padding: "8px 4px",
-                                            borderRadius: 4,
-                                            border: "none",
-                                            background: seat.isBooked
-                                                ? "rgba(239, 68, 68, 0.3)"
-                                                : selectedSeats.includes(seat.id)
-                                                    ? "#a78bfa"
-                                                    : "rgba(16, 185, 129, 0.3)",
-                                            color: seat.isBooked
-                                                ? "rgba(239, 68, 68, 0.5)"
-                                                : "#fff",
-                                            cursor: seat.isBooked ? "not-allowed" : "pointer",
-                                            fontSize: 10,
-                                            fontWeight: 500
-                                        }}
+                                        title={`Row ${seat.row}, Seat ${seat.number} - Rs. ${seat.price}`}
+                                        className={`seat-btn ${seat.isBooked ? 'booked' : selectedSeats.includes(seat.id) ? 'selected' : 'available'}`}
                                     >
                                         {seat.row}{seat.number}
                                     </button>
                                 ))}
                             </div>
-                            <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <div style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(16, 185, 129, 0.3)" }}></div>
-                                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>Available</span>
+                            <div className="seat-legend">
+                                <div className="legend-item">
+                                    <div className="legend-box available"></div>
+                                    <span>Available</span>
                                 </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <div style={{ width: 16, height: 16, borderRadius: 4, background: "#a78bfa" }}></div>
-                                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>Selected</span>
+                                <div className="legend-item">
+                                    <div className="legend-box selected"></div>
+                                    <span>Selected</span>
                                 </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <div style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(239, 68, 68, 0.3)" }}></div>
-                                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>Booked</span>
+                                <div className="legend-item">
+                                    <div className="legend-box booked"></div>
+                                    <span>Booked</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style={{
-                            background: "rgba(255,255,255,0.05)",
-                            borderRadius: 12,
-                            padding: 20,
-                            marginBottom: 24
-                        }}>
-                            <h3 style={{ color: "#fff", marginBottom: 16, fontSize: 18 }}>Price Summary</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ color: "rgba(255,255,255,0.7)" }}>Seats ({selectedSeats.length})</span>
-                                <span style={{ color: "#fff" }}>${calculateTotal()}</span>
+                        <div className="price-summary">
+                            <h3>Price Summary</h3>
+                            <div className="price-row">
+                                <span>Seats ({selectedSeats.length})</span>
+                                <span>Rs. {calculateTotal()}</span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-                                <span style={{ color: "#fff", fontWeight: 600 }}>Total</span>
-                                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 20 }}>${calculateTotal()}</span>
+                            <div className="price-total">
+                                <span>Total</span>
+                                <span>Rs. {calculateTotal()}</span>
                             </div>
                         </div>
 
                         <button
                             onClick={handleBooking}
                             disabled={bookingLoading || selectedSeats.length === 0}
-                            style={{
-                                width: "100%",
-                                padding: "16px 32px",
-                                borderRadius: 10,
-                                border: "none",
-                                background: selectedSeats.length === 0 ? "rgba(255,255,255,0.1)" : "linear-gradient(90deg,#7c3aed,#a78bfa)",
-                                color: selectedSeats.length === 0 ? "rgba(255,255,255,0.3)" : "#fff",
-                                fontSize: 16,
-                                fontWeight: 600,
-                                cursor: selectedSeats.length === 0 ? "not-allowed" : "pointer",
-                                opacity: bookingLoading ? 0.7 : 1
-                            }}
+                            className="book-btn"
                         >
-                            {bookingLoading ? "Processing..." : `Book Now - $${calculateTotal()}`}
+                            {bookingLoading ? "Booking Complete" : `Book Now - Rs. ${calculateTotal()}`}
                         </button>
                     </div>
 
-                    <div style={{
-                        background: "rgba(255,255,255,0.05)",
-                        borderRadius: 16,
-                        padding: 24,
-                        position: "sticky",
-                        top: 20
-                    }}>
-                        <h3 style={{ color: "#fff", marginBottom: 20, fontSize: 18 }}>Screen</h3>
-                        <div style={{
-                            height: 8,
-                            background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.5),transparent)",
-                            borderRadius: 4,
-                            marginBottom: 32
-                        }}></div>
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(12, 1fr)",
-                            gap: 4
-                        }}>
+                    <div className="seat-map-preview">
+                        <h3>Screen</h3>
+                        <div className="screen-indicator"></div>
+                        <div className="seat-grid-preview">
                             {seats.slice(0, 72).map((seat) => (
                                 <div
                                     key={seat.id}
-                                    style={{
-                                        padding: "6px 2px",
-                                        borderRadius: 4,
-                                        textAlign: "center",
-                                        fontSize: 9,
-                                        background: seat.isBooked
-                                            ? "rgba(239, 68, 68, 0.3)"
-                                            : selectedSeats.includes(seat.id)
-                                                ? "#a78bfa"
-                                                : "rgba(16, 185, 129, 0.3)",
-                                        color: seat.isBooked
-                                            ? "rgba(239, 68, 68, 0.5)"
-                                            : "#fff"
-                                    }}
+                                    className={`seat-preview ${seat.isBooked ? 'booked' : selectedSeats.includes(seat.id) ? 'selected' : 'available'}`}
                                 >
                                     {seat.row}{seat.number}
                                 </div>
                             ))}
                         </div>
-                        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textAlign: "center", marginTop: 16 }}>
-                            Screen is this way ↑
-                        </p>
+                        <p className="screen-label">Screen is this way ↑</p>
                     </div>
                 </div>
             )}

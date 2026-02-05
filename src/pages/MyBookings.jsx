@@ -3,30 +3,45 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getUserBookings } from "../services/firestore.js";
 
+// Helper function to format dates (handles both string and Firestore Timestamp)
+const formatDate = (dateValue) => {
+    if (!dateValue) return "";
+    const dateObj = dateValue?.toDate?.() || new Date(dateValue);
+    return dateObj.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+    });
+};
+
+// Helper to format time
+const formatTime = (timeValue) => {
+    if (!timeValue) return "";
+    return timeValue;
+};
+
 const MyBookings = () => {
     const { user } = useAuth();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Load bookings from Firestore
         const loadBookings = async () => {
             if (!user) {
+                console.log("NO USER - Not loading bookings");
                 setLoading(false);
                 return;
             }
 
             try {
                 setLoading(true);
-                const bookingsData = await getUserBookings(user.uid);
-                setBookings(bookingsData);
+                console.log("FETCHING BOOKINGS FOR UID:", user.uid);
+                const firestoreBookings = await getUserBookings(user.uid);
+                console.log("FIRESTORE BOOKINGS:", firestoreBookings);
+                setBookings(firestoreBookings);
             } catch (error) {
                 console.error("Error loading bookings:", error);
-                // Fallback to localStorage
-                const savedBookings = localStorage.getItem("myBookings");
-                if (savedBookings) {
-                    setBookings(JSON.parse(savedBookings));
-                }
+                setBookings([]);
             } finally {
                 setLoading(false);
             }
@@ -88,7 +103,7 @@ const MyBookings = () => {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {bookings.map((booking, index) => (
-                    <div key={index} style={{
+                    <div key={booking.id || index} style={{
                         background: "rgba(255,255,255,0.08)",
                         borderRadius: 12,
                         padding: 20,
@@ -98,15 +113,15 @@ const MyBookings = () => {
                     }}>
                         <img
                             src={booking.poster}
-                            alt={booking.title}
+                            alt={booking.movieTitle || booking.title}
                             style={{ width: 80, height: 120, objectFit: "cover", borderRadius: 8 }}
                         />
                         <div style={{ flex: 1 }}>
                             <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
-                                {booking.title}
+                                {booking.movieTitle || booking.title}
                             </h3>
                             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
-                                📅 {booking.date} at {booking.time}
+                                📅 {formatDate(booking.date)} at {formatTime(booking.time)}
                             </p>
                             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
                                 🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}
@@ -125,7 +140,7 @@ const MyBookings = () => {
                                 fontSize: 14,
                                 fontWeight: 600
                             }}>
-                                ${booking.totalAmount || booking.totalPrice}
+                                Rs. {booking.totalAmount || booking.totalPrice}
                             </span>
                         </div>
                     </div>
