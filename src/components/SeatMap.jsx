@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function LogoutConfirmationModel() {
+export default function SeatMap() {
   return (
     <div>
       

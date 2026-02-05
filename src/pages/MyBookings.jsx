@@ -1,0 +1,138 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getUserBookings } from "../services/firestore.js";
+
+const MyBookings = () => {
+    const { user } = useAuth();
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Load bookings from Firestore
+        const loadBookings = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setLoading(true);
+                const bookingsData = await getUserBookings(user.uid);
+                setBookings(bookingsData);
+            } catch (error) {
+                console.error("Error loading bookings:", error);
+                // Fallback to localStorage
+                const savedBookings = localStorage.getItem("myBookings");
+                if (savedBookings) {
+                    setBookings(JSON.parse(savedBookings));
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadBookings();
+    }, [user]);
+
+    if (loading) {
+        return (
+            <div style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: "60vh",
+                color: "#fff"
+            }}>
+                Loading your bookings...
+            </div>
+        );
+    }
+
+    if (bookings.length === 0) {
+        return (
+            <div style={{
+                maxWidth: 600,
+                margin: "0 auto",
+                padding: "60px 20px",
+                textAlign: "center"
+            }}>
+                <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16, color: "#fff" }}>
+                    My Bookings
+                </h1>
+                <p style={{ fontSize: 16, color: "rgba(255,255,255,0.7)", marginBottom: 32 }}>
+                    You haven't booked any movies yet.
+                </p>
+                <Link to="/movies">
+                    <button style={{
+                        padding: "14px 28px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "linear-gradient(90deg,#7c3aed,#a78bfa)",
+                        color: "#fff",
+                        fontSize: 16,
+                        fontWeight: 600,
+                        cursor: "pointer"
+                    }}>
+                        Browse Movies
+                    </button>
+                </Link>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 20px" }}>
+            <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 32, color: "#fff" }}>
+                My Bookings
+            </h1>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {bookings.map((booking, index) => (
+                    <div key={index} style={{
+                        background: "rgba(255,255,255,0.08)",
+                        borderRadius: 12,
+                        padding: 20,
+                        display: "flex",
+                        gap: 20,
+                        alignItems: "center"
+                    }}>
+                        <img
+                            src={booking.poster}
+                            alt={booking.title}
+                            style={{ width: 80, height: 120, objectFit: "cover", borderRadius: 8 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "#fff" }}>
+                                {booking.title}
+                            </h3>
+                            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                                📅 {booking.date} at {booking.time}
+                            </p>
+                            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
+                                🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}
+                            </p>
+                            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
+                                📍 Theatre: {booking.theatreName}
+                            </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                            <span style={{
+                                display: "inline-block",
+                                padding: "6px 12px",
+                                background: "rgba(167, 139, 250, 0.2)",
+                                color: "#a78bfa",
+                                borderRadius: 20,
+                                fontSize: 14,
+                                fontWeight: 600
+                            }}>
+                                ${booking.totalAmount || booking.totalPrice}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export default MyBookings;

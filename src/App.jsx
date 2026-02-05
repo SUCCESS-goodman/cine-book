@@ -1,36 +1,70 @@
 // App.jsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 
-import ErrorBoundary from "./components/ErrorBoundary";
-import Navbar from "./pages/Navbar";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Movies from "./pages/Movies";
-import MoviesDetails from "./pages/MoviesDetails";
-import Booking from "./pages/Booking";
-import MyBookings from "./pages/MyBookings";
-import NotFound from "./pages/NotFound";
+import ErrorBoundary from "./assets/components/ErrorBoundary";
+import { ProtectedRoute } from "./assets/components/ProtectedRoute";
+import Navbar from "./components/AppNavbar.jsx";
 
-function App() {
+
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Home from "./pages/Home.jsx";
+import Movies from "./pages/Movies.jsx";
+import MoviesDetails from "./pages/MoviesDetails.jsx";
+import Booking from "./pages/Booking.jsx";
+import MyBookings from "./pages/MyBookings.jsx";
+import NotFound from "./pages/NotFound.jsx";
+
+import { seedFirestore } from "./seed/seedMovies";
+
+
+const App = () => {
+  useEffect(() => {
+    seedFirestore();
+  }, []); // runs once on app load
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <Navbar /> {/* Navbar contains Links */}
+        <Navbar />
 
         <Routes>
-          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/movies" element={<Movies />} />
-          <Route path="/movies/:id" element={<MoviesDetails />} />
-          <Route path="/booking" element={<Booking />} />
-          <Route path="/bookings" element={<MyBookings />} />
+
+          {/* Protected Routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } />
+          <Route path="/movies" element={
+            <ProtectedRoute>
+              <Movies />
+            </ProtectedRoute>
+          } />
+          <Route path="/movies/:id" element={
+            <ProtectedRoute>
+              <MoviesDetails />
+            </ProtectedRoute>
+          } />
+          <Route path="/booking/:id" element={
+            <ProtectedRoute>
+              <Booking />
+            </ProtectedRoute>
+          } />
+          <Route path="/bookings" element={
+            <ProtectedRoute>
+              <MyBookings />
+            </ProtectedRoute>
+          } />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
   );
-}
+};
 
 export default App;
