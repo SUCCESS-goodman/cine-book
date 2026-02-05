@@ -52,16 +52,29 @@ export const createBooking = async (bookingData) => {
 export const getUserBookings = async (userId) => {
     console.log("FIRESTORE: Querying bookings for userId:", userId);
     const bookingsRef = collection(db, "bookings");
+    // Temporarily removed orderBy to avoid composite index requirement
+    // Will re-add once we confirm basic query works
     const q = query(
         bookingsRef,
-        where("userId", "==", userId),
-        orderBy("createdAt", "desc")
+        where("userId", "==", userId)
     );
-    const snapshot = await getDocs(q);
-    console.log("FIRESTORE: Found", snapshot.docs.length, "bookings");
-    const bookings = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    console.log("FIRESTORE: Bookings data:", bookings);
-    return bookings;
+    try {
+        const snapshot = await getDocs(q);
+        console.log("FIRESTORE: Found", snapshot.docs.length, "bookings");
+        const bookings = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        console.log("FIRESTORE: Bookings data:", bookings);
+        return bookings;
+    } catch (error) {
+        console.error("FIRESTORE ERROR:", error);
+        // If error, try without query
+        console.log("FIRESTORE: Trying to fetch all bookings to debug");
+        const allSnapshot = await getDocs(bookingsRef);
+        console.log("FIRESTORE: Total bookings in collection:", allSnapshot.docs.length);
+        allSnapshot.docs.forEach(doc => {
+            console.log("FIRESTORE: Booking:", doc.id, doc.data());
+        });
+        throw error;
+    }
 };
 
 export const getBookingById = async (bookingId) => {
