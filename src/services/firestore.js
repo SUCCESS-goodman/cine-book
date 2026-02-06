@@ -42,15 +42,20 @@ export const getMoviesByStatus = async (status) => {
 export const createBooking = async (bookingData) => {
     const bookingsRef = collection(db, "bookings");
     console.log("FIRESTORE: Saving booking for user:", bookingData.userId);
-    const docRef = await addDoc(bookingsRef, {
-        ...bookingData,
-        createdAt: new Date().toISOString(),
-    });
-    console.log("FIRESTORE: Booking saved with ID:", docRef.id);
-    return {
-        id: docRef.id,
-        ...bookingData,
-    };
+    try {
+        const docRef = await addDoc(bookingsRef, {
+            ...bookingData,
+            createdAt: new Date().toISOString(),
+        });
+        console.log("FIRESTORE: Booking saved with ID:", docRef.id);
+        return {
+            id: docRef.id,
+            ...bookingData,
+        };
+    } catch (error) {
+        console.error("FIRESTORE ERROR in createBooking:", error);
+        throw error; // Critical - re-throw so UI can catch it
+    }
 };
 
 export const getUserBookings = async (userId) => {
@@ -102,8 +107,15 @@ export const cancelBooking = async (bookingId) => {
 };
 
 export const deleteBooking = async (bookingId) => {
+    console.log("FIRESTORE: Attempting to delete booking:", bookingId);
     const bookingRef = doc(db, "bookings", bookingId);
-    await deleteDoc(bookingRef);
+    try {
+        await deleteDoc(bookingRef);
+        console.log("FIRESTORE: Booking deleted successfully:", bookingId);
+    } catch (error) {
+        console.error("FIRESTORE ERROR in deleteBooking:", error);
+        throw error; // Critical - re-throw so UI can catch it
+    }
 };
 
 // Theatres Collection

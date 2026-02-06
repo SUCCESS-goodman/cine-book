@@ -26,17 +26,24 @@ const MyBookings = () => {
     const [loading, setLoading] = useState(true);
 
     const handleDeleteBooking = async (bookingId) => {
-        if (!window.confirm("Are you sure you want to delete this booking?")) {
+        console.log("DELETE: Attempting to delete booking ID:", bookingId);
+
+        if (!window.confirm("Are you sure you want to delete this booking? This cannot be undone.")) {
             return;
         }
 
         try {
             await deleteBooking(bookingId);
+            console.log("DELETE: Successfully deleted booking:", bookingId);
+
+            // Update UI
             setBookings(prev => prev.filter(b => b.id !== bookingId));
             alert("Booking deleted successfully!");
         } catch (error) {
-            console.error("Error deleting booking:", error);
-            alert("Failed to delete booking. Please try again.");
+            console.error("DELETE FAILED ❌", error);
+            // Show user-friendly error with details
+            const errorMessage = error.message || "Unknown error";
+            alert(`Failed to delete booking: ${errorMessage}\n\nCheck browser console for details.`);
         }
     };
 
@@ -156,7 +163,7 @@ const MyBookings = () => {
                                 fontWeight: 600,
                                 marginBottom: 8
                             }}>
-                                Rs. {(booking.totalAmount || booking.totalPrice || 0).toLocaleString()}
+                                $ {(booking.totalAmount || booking.totalPrice || 0).toLocaleString()}
                             </span>
                             <button
                                 onClick={() => handleDeleteBooking(booking.id)}

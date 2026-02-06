@@ -50,17 +50,17 @@ const generateSeats = () => {
         for (let i = 1; i <= seatsPerRow; i++) {
             let price = 1000;
 
-            // Front rows (A, B, C) = Rs. 1500
+            // Front rows (A, B, C) = $15
             if (row === "A" || row === "B" || row === "C") {
-                price = 1500;
+                price = 15;
             }
-            // Middle rows (D, E) = Rs. 1200
+            // Middle rows (D, E) = $12
             else if (row === "D" || row === "E") {
-                price = 1200;
+                price = 12;
             }
-            // Back row (F) = Rs. 1000
+            // Back row (F) = $10
             else {
-                price = 1000;
+                price = 10;
             }
 
             seats.push({
@@ -305,8 +305,12 @@ const Booking = () => {
             console.log("SAVING BOOKING:", booking);
 
             const savedBooking = await createBooking(booking);
-
             console.log("BOOKING SAVED ✅", savedBooking);
+
+            // Validate that we got a booking ID back
+            if (!savedBooking?.id) {
+                throw new Error("No booking ID returned from server");
+            }
 
             // Update UI instantly with the saved booking
             setUserBookings(prev => [...prev, savedBooking]);
@@ -324,7 +328,9 @@ const Booking = () => {
             setShowConfirmationModal(true);
         } catch (error) {
             console.error("BOOKING FAILED ❌", error);
-            alert("Failed to complete booking. Please try again.");
+            // Show user-friendly error with details
+            const errorMessage = error.message || "Unknown error";
+            alert(`Failed to complete booking: ${errorMessage}\n\nCheck browser console for details.`);
         } finally {
             setBookingLoading(false);
         }
@@ -337,17 +343,24 @@ const Booking = () => {
     };
 
     const handleDeleteBooking = async (bookingId) => {
-        if (!window.confirm("Are you sure you want to delete this booking?")) {
+        console.log("DELETE: Attempting to delete booking ID:", bookingId);
+
+        if (!window.confirm("Are you sure you want to delete this booking? This cannot be undone.")) {
             return;
         }
 
         try {
             await deleteBooking(bookingId);
+            console.log("DELETE: Successfully deleted booking:", bookingId);
+
+            // Update UI
             setUserBookings(prev => prev.filter(b => b.id !== bookingId));
             alert("Booking deleted successfully!");
         } catch (error) {
-            console.error("Error deleting booking:", error);
-            alert("Failed to delete booking. Please try again.");
+            console.error("DELETE FAILED ❌", error);
+            // Show user-friendly error with details
+            const errorMessage = error.message || "Unknown error";
+            alert(`Failed to delete booking: ${errorMessage}\n\nCheck browser console for details.`);
         }
     };
 
@@ -395,7 +408,7 @@ const Booking = () => {
                                     <p>📅 {formatDate(booking.date)} at {booking.time}</p>
                                     <p>🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}</p>
                                     <p>📍 {booking.theatreName}</p>
-                                    <p>💰 Total: Rs. {booking.totalAmount?.toLocaleString() || 0}</p>
+                                    <p>💰 Total: $ {booking.totalAmount?.toLocaleString() || 0}</p>
                                 </div>
                                 <div className="booking-item-actions">
                                     <span className={`booking-status ${booking.status}`}>
@@ -476,7 +489,7 @@ const Booking = () => {
                                 </div>
                                 <div className="confirmation-row total">
                                     <span className="confirmation-label">💰 Total</span>
-                                    <span className="confirmation-value">Rs. {confirmationData.totalAmount.toLocaleString()}</span>
+                                    <span className="confirmation-value">$ {confirmationData.totalAmount.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -566,7 +579,7 @@ const Booking = () => {
                                         key={seat.id}
                                         onClick={() => !seat.isBooked && toggleSeat(seat.id)}
                                         disabled={seat.isBooked}
-                                        title={`Row ${seat.row}, Seat ${seat.number} - Rs. ${seat.price}`}
+                                        title={`Row ${seat.row}, Seat ${seat.number} - $ ${seat.price}`}
                                         className={`seat-btn ${seat.isBooked ? 'booked' : selectedSeats.includes(seat.id) ? 'selected' : 'available'}`}
                                     >
                                         {seat.row}{seat.number}
@@ -596,13 +609,13 @@ const Booking = () => {
                                 return (
                                     <div key={seatId} className="price-row">
                                         <span>Seat {seatId} (Row {seat?.row})</span>
-                                        <span>Rs. {seat?.price?.toLocaleString()}</span>
+                                        <span>$ {seat?.price?.toLocaleString()}</span>
                                     </div>
                                 );
                             })}
                             <div className="price-total">
                                 <span>Total</span>
-                                <span>Rs. {calculateTotal().toLocaleString()}</span>
+                                <span>$ {calculateTotal().toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -611,7 +624,7 @@ const Booking = () => {
                             disabled={bookingLoading || selectedSeats.length === 0}
                             className="book-btn"
                         >
-                            {bookingLoading ? "Booking Complete" : `Book Now - Rs. ${calculateTotal().toLocaleString()}`}
+                            {bookingLoading ? "Booking Complete" : `Book Now - $ ${calculateTotal().toLocaleString()}`}
                         </button>
                     </div>
 

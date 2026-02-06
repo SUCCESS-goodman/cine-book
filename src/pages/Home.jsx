@@ -11,9 +11,11 @@ const Home = () => {
     const [movies, setMovies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [featuredMovie, setFeaturedMovie] = useState(null);
+    const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
 
     useEffect(() => {
         let mounted = true;
+        let autoRotateInterval;
 
         const loadMovies = async () => {
             try {
@@ -56,11 +58,20 @@ const Home = () => {
                     setMovies(sampleMovies);
                     console.log("HOME: Set fallback movies, count:", sampleMovies.length);
                     setFeaturedMovie(sampleMovies[0]);
+
+                    // Start auto-rotation for hero section
+                    autoRotateInterval = setInterval(() => {
+                        setCurrentHeroIndex(prev => (prev + 1) % sampleMovies.length);
+                    }, 5000); // Rotate every 5 seconds
                 } else {
                     setMovies(moviesData);
                     console.log("HOME: Set Firestore movies, count:", moviesData.length);
                     if (moviesData.length > 0) {
-                        setFeaturedMovie(moviesData[Math.floor(Math.random() * moviesData.length)]);
+                        setFeaturedMovie(moviesData[0]);
+                        // Start auto-rotation for hero section
+                        autoRotateInterval = setInterval(() => {
+                            setCurrentHeroIndex(prev => (prev + 1) % moviesData.length);
+                        }, 5000); // Rotate every 5 seconds
                     }
                 }
                 console.log("HOME: Movies state updated, total:", movies.length);
@@ -77,8 +88,18 @@ const Home = () => {
 
         return () => {
             mounted = false;
+            if (autoRotateInterval) {
+                clearInterval(autoRotateInterval);
+            }
         };
     }, []);
+
+    // Update featured movie when index changes
+    useEffect(() => {
+        if (movies.length > 0) {
+            setFeaturedMovie(movies[currentHeroIndex]);
+        }
+    }, [currentHeroIndex, movies]);
 
     const handleImageError = (e) => {
         e.target.src = FALLBACK_IMAGE;
@@ -159,7 +180,7 @@ const Home = () => {
             {/* Trending Section - All Now Showing Movies */}
             <section className="all-movies-section">
                 <h2 className="section-title">All Movies ({trendingMovies.length})</h2>
-                <div className="movies-grid">
+                <div className="movies-scrollable-row">
                     {trendingMovies.map((movie) => (
                         <MovieCard key={movie.id} movie={movie} size="medium" showStatus />
                     ))}
@@ -176,8 +197,8 @@ const Home = () => {
             {comingSoonMovies.length > 0 && (
                 <section className="all-movies-section coming-soon-section">
                     <h2 className="section-title">Coming Soon ({comingSoonMovies.length})</h2>
-                    <div className="movies-grid">
-                        {comingSoonMovies.slice(0, 3).map((movie) => (
+                    <div className="movies-scrollable-row">
+                        {comingSoonMovies.map((movie) => (
                             <MovieCard key={movie.id} movie={movie} size="medium" showStatus />
                         ))}
                     </div>
