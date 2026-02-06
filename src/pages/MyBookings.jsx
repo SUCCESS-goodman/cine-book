@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getUserBookings } from "../services/firestore.js";
+import { getUserBookings, deleteBooking } from "../services/firestore.js";
 
 // Helper function to format dates (handles both string and Firestore Timestamp)
 const formatDate = (dateValue) => {
@@ -24,6 +24,21 @@ const MyBookings = () => {
     const { user } = useAuth();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const handleDeleteBooking = async (bookingId) => {
+        if (!window.confirm("Are you sure you want to delete this booking?")) {
+            return;
+        }
+
+        try {
+            await deleteBooking(bookingId);
+            setBookings(prev => prev.filter(b => b.id !== bookingId));
+            alert("Booking deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting booking:", error);
+            alert("Failed to delete booking. Please try again.");
+        }
+    };
 
     useEffect(() => {
         const loadBookings = async () => {
@@ -102,8 +117,8 @@ const MyBookings = () => {
             </h1>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {bookings.map((booking, index) => (
-                    <div key={booking.id || index} style={{
+                {bookings.map((booking) => (
+                    <div key={booking.id} style={{
                         background: "rgba(255,255,255,0.08)",
                         borderRadius: 12,
                         padding: 20,
@@ -138,10 +153,28 @@ const MyBookings = () => {
                                 color: "#a78bfa",
                                 borderRadius: 20,
                                 fontSize: 14,
-                                fontWeight: 600
+                                fontWeight: 600,
+                                marginBottom: 8
                             }}>
                                 Rs. {(booking.totalAmount || booking.totalPrice || 0).toLocaleString()}
                             </span>
+                            <button
+                                onClick={() => handleDeleteBooking(booking.id)}
+                                style={{
+                                    display: "block",
+                                    marginTop: 8,
+                                    padding: "6px 12px",
+                                    background: "rgba(239,68,68,0.2)",
+                                    border: "1px solid #ef4444",
+                                    color: "#ef4444",
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                    fontSize: 12,
+                                    width: "100%"
+                                }}
+                            >
+                                🗑️ Remove
+                            </button>
                         </div>
                     </div>
                 ))}

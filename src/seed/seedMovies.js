@@ -397,12 +397,10 @@ export async function seedFirestore() {
     const movieRef = collection(db, "movies");
     const existingMovies = await getDocs(movieRef);
 
-    // Clear existing movies to update with correct posters
+    // Only seed if database is empty (prevents quota issues)
     if (existingMovies.size > 0) {
-        console.log("Clearing existing movies to update with correct posters...")
-        for (const docSnapshot of existingMovies.docs) {
-            await deleteDoc(doc(db, "movies", docSnapshot.id));
-        }
+        console.log("Movies already seeded, skipping...");
+        return;
     }
 
     console.log("starting the seeding process......")

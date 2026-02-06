@@ -56,14 +56,22 @@ const Movies = () => {
     ];
 
     useEffect(() => {
+        let mounted = true;
+
         const loadMovies = async () => {
             try {
                 setLoading(true);
                 const moviesData = await getAllMovies();
+                console.log("MOVIES: Got", moviesData.length, "movies from Firestore");
 
-                if (moviesData.length === 0) {
+                if (!mounted) return;
+
+                // Fallback to sample movies if Firestore is empty or has too few movies
+                if (moviesData.length < 10) {
+                    console.log("MOVIES: Firestore has fewer than 10 movies, using fallback sample movies");
                     setMovies(sampleMovies);
                 } else {
+                    console.log("MOVIES: Using Firestore movies");
                     const formattedMovies = moviesData.map(movie => ({
                         id: movie.id,
                         title: movie.title,
@@ -72,19 +80,26 @@ const Movies = () => {
                         genre: Array.isArray(movie.genre) ? movie.genre.join(", ") : movie.genre,
                         duration: movie.duration,
                         trailer: getEmbedUrl(movie.trailer),
-                        status: movie.status
+                        status: movie.status || "now_showing" // Default status
                     }));
                     setMovies(formattedMovies);
                 }
+                console.log("MOVIES: Movies state updated, total:", movies.length);
             } catch (error) {
                 console.error("Error loading movies:", error);
             } finally {
-                setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                }
             }
         };
 
         loadMovies();
-    }, [location.pathname]);
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const scrollRow = (direction, rowId) => {
         const row = document.getElementById(rowId);

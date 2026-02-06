@@ -5,6 +5,7 @@ import {
     getDocs,
     addDoc,
     updateDoc,
+    deleteDoc,
     query,
     where,
     orderBy,
@@ -15,7 +16,10 @@ import { db } from "../config/firebase.js";
 export const getAllMovies = async () => {
     const moviesRef = collection(db, "movies");
     const snapshot = await getDocs(moviesRef);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("FIRESTORE: getAllMovies found", snapshot.docs.length, "movies");
+    const movies = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log("FIRESTORE: Movies data:", movies);
+    return movies;
 };
 
 export const getMovieById = async (id) => {
@@ -61,7 +65,10 @@ export const getUserBookings = async (userId) => {
     try {
         const snapshot = await getDocs(q);
         console.log("FIRESTORE: Found", snapshot.docs.length, "bookings");
-        const bookings = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const bookings = snapshot.docs.map(doc => ({
+            id: doc.id, // ✅ REQUIRED for delete/update
+            ...doc.data()
+        }));
         console.log("FIRESTORE: Bookings data:", bookings);
         return bookings;
     } catch (error) {
@@ -92,6 +99,11 @@ export const cancelBooking = async (bookingId) => {
         status: "cancelled",
         cancelledAt: new Date().toISOString(),
     });
+};
+
+export const deleteBooking = async (bookingId) => {
+    const bookingRef = doc(db, "bookings", bookingId);
+    await deleteDoc(bookingRef);
 };
 
 // Theatres Collection

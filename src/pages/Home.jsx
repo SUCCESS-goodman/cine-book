@@ -13,13 +13,19 @@ const Home = () => {
     const [featuredMovie, setFeaturedMovie] = useState(null);
 
     useEffect(() => {
+        let mounted = true;
+
         const loadMovies = async () => {
             try {
                 setLoading(true);
                 const moviesData = await getAllMovies();
+                console.log("HOME: Got", moviesData.length, "movies from Firestore");
 
-                // Fallback to sample movies if Firestore is empty
-                if (moviesData.length === 0) {
+                if (!mounted) return;
+
+                // Fallback to sample movies if Firestore is empty or has too few movies
+                if (moviesData.length < 10) {
+                    console.log("HOME: Firestore has fewer than 10 movies, using fallback sample movies");
                     const sampleMovies = [
                         { id: "movie_1", title: "Avengers: Endgame", image: "https://image.tmdb.org/t/p/original/or06FN3Dka5tukK1e9sl16pB3iy.jpg", rating: 8.4, genre: "Action, Sci-Fi", duration: "3h 01m", description: "After the devastating events of Infinity War, the Avengers assemble once more to reverse Thanos' actions.", status: "now_showing" },
                         { id: "movie_2", title: "Interstellar", image: "https://image.tmdb.org/t/p/original/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", rating: 8.6, genre: "Sci-Fi, Drama", duration: "2h 49m", description: "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.", status: "now_showing" },
@@ -48,21 +54,30 @@ const Home = () => {
                         { id: "movie_25", title: "Parasite", image: "https://image.tmdb.org/t/p/original/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg", rating: 8.5, genre: "Drama, Thriller", duration: "2h 12m", description: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.", status: "now_showing" }
                     ];
                     setMovies(sampleMovies);
+                    console.log("HOME: Set fallback movies, count:", sampleMovies.length);
                     setFeaturedMovie(sampleMovies[0]);
                 } else {
                     setMovies(moviesData);
+                    console.log("HOME: Set Firestore movies, count:", moviesData.length);
                     if (moviesData.length > 0) {
                         setFeaturedMovie(moviesData[Math.floor(Math.random() * moviesData.length)]);
                     }
                 }
+                console.log("HOME: Movies state updated, total:", movies.length);
             } catch (error) {
                 console.error("Error loading movies:", error);
             } finally {
-                setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                }
             }
         };
 
         loadMovies();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const handleImageError = (e) => {
@@ -72,10 +87,11 @@ const Home = () => {
     // Separate movies by status
     const nowShowingMovies = movies.filter(m => m.status === "now_showing");
     const comingSoonMovies = movies.filter(m => m.status === "coming_soon");
-    // Get top 15 rated movies for trending section
+    // Get all movies for trending section (no limit)
     const trendingMovies = [...nowShowingMovies]
-        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-        .slice(0, 15);
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+    console.log("HOME: Rendering - movies:", movies.length, "nowShowing:", nowShowingMovies.length, "trending:", trendingMovies.length);
 
     if (loading) {
         return (
@@ -140,9 +156,9 @@ const Home = () => {
                 <div className="hero-fade-bottom"></div>
             </section>
 
-            {/* Trending Section - Top 15 Movies */}
+            {/* Trending Section - All Now Showing Movies */}
             <section className="all-movies-section">
-                <h2 className="section-title">Trending Now ({trendingMovies.length})</h2>
+                <h2 className="section-title">All Movies ({trendingMovies.length})</h2>
                 <div className="movies-grid">
                     {trendingMovies.map((movie) => (
                         <MovieCard key={movie.id} movie={movie} size="medium" showStatus />

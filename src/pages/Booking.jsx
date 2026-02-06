@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getMovieById, createBooking, getAllTheatres, getUserBookings } from "../services/firestore.js";
+import { getMovieById, createBooking, getAllTheatres, getUserBookings, deleteBooking } from "../services/firestore.js";
 import "./Booking.css";
 
 // Sample fallback theatres
@@ -48,15 +48,33 @@ const generateSeats = () => {
 
     rows.forEach(row => {
         for (let i = 1; i <= seatsPerRow; i++) {
+            let price = 1000;
+
+            // Front rows (A, B, C) = Rs. 1500
+            if (row === "A" || row === "B" || row === "C") {
+                price = 1500;
+            }
+            // Middle rows (D, E) = Rs. 1200
+            else if (row === "D" || row === "E") {
+                price = 1200;
+            }
+            // Back row (F) = Rs. 1000
+            else {
+                price = 1000;
+            }
+
             seats.push({
                 id: `${row}${i}`,
                 row,
                 number: i,
                 isBooked: false,
-                price: row <= "C" ? 1500 : row <= "E" ? 1200 : 1000 // Prices in NPR
+                price: price // Prices in NPR
             });
         }
     });
+
+    // Debug: log sample prices
+    console.log("Generated seats - Sample A1:", seats[0]?.price, "F1:", seats[60]?.price);
     return seats;
 };
 
@@ -227,10 +245,12 @@ const Booking = () => {
     };
 
     const calculateTotal = () => {
-        return selectedSeats.reduce((total, seatId) => {
+        const total = selectedSeats.reduce((sum, seatId) => {
             const seat = seats.find(s => s.id === seatId);
-            return total + (seat?.price || 0);
+            return sum + (seat?.price || 0);
         }, 0);
+        console.log("CalculateTotal:", { selectedSeats, total, samplePrices: seats.slice(0, 3).map(s => ({ id: s.id, price: s.price })) });
+        return total;
     };
 
     const handleBooking = async () => {
@@ -316,6 +336,21 @@ const Booking = () => {
         setBookingSuccess(true);
     };
 
+    const handleDeleteBooking = async (bookingId) => {
+        if (!window.confirm("Are you sure you want to delete this booking?")) {
+            return;
+        }
+
+        try {
+            await deleteBooking(bookingId);
+            setUserBookings(prev => prev.filter(b => b.id !== bookingId));
+            alert("Booking deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting booking:", error);
+            alert("Failed to delete booking. Please try again.");
+        }
+    };
+
     if (loading) {
         return (
             <div className="booking-loading">
@@ -354,16 +389,26 @@ const Booking = () => {
                         🎬 Your Previous Bookings for {movie.title}
                     </h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {userBookings.map((booking, index) => (
-                            <div key={index} className="booking-item">
+                        {userBookings.map((booking) => (
+                            <div key={booking.id} className="booking-item">
                                 <div className="booking-item-info">
                                     <p>📅 {formatDate(booking.date)} at {booking.time}</p>
                                     <p>🎟️ Seats: {Array.isArray(booking.seats) ? booking.seats.map(s => s.id || s).join(", ") : booking.seats}</p>
                                     <p>📍 {booking.theatreName}</p>
+                                    <p>💰 Total: Rs. {booking.totalAmount?.toLocaleString() || 0}</p>
                                 </div>
-                                <span className={`booking-status ${booking.status}`}>
-                                    {booking.status}
-                                </span>
+                                <div className="booking-item-actions">
+                                    <span className={`booking-status ${booking.status}`}>
+                                        {booking.status}
+                                    </span>
+                                    <button
+                                        className="delete-booking-btn"
+                                        onClick={() => handleDeleteBooking(booking.id)}
+                                        title="Delete Booking"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

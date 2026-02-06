@@ -275,11 +275,18 @@
     padding: 0 var(--container-padding);
     position: relative;
     z-index: 10;
+    min-height: 200px;
 }
 
 /* Override MovieCard width inside All Movies grid */
 .movies-all-grid>* {
     width: auto !important;
+}
+
+/* Ensure movies are visible */
+.movies-all-grid .movie-card {
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 /* Footer */

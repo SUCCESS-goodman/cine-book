@@ -20,9 +20,12 @@ import { seedFirestore } from "./seed/seedMovies";
 
 
 const App = () => {
-  useEffect(() => {
-    seedFirestore();
-  }, []); // runs once on app load
+  // Commented out auto-seeding to prevent Firebase quota issues
+  // The app uses fallback sample movies when Firestore is empty
+  // To seed movies manually, run the seed function from console or create a seed button
+  // useEffect(() => {
+  //   seedFirestore();
+  // }, []);
 
   return (
     <ErrorBoundary>
